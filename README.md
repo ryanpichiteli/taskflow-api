@@ -4,12 +4,13 @@ API REST para gerenciamento de projetos e tarefas em equipe, construída com Spr
 
 ## Visão geral do domínio
 
-Usuários criam **projetos**, adicionam **membros**, e organizam o trabalho em **tarefas** com status, prioridade e responsável. Cada tarefa pode receber **comentários** dos membros do projeto.
+Usuários criam **projetos**, convidam **membros por e-mail**, e organizam o trabalho em **tarefas** com status, prioridade e responsável. Cada tarefa pode receber **comentários** dos membros do projeto.
 
 Regras de negócio aplicadas na camada de serviço:
 
 - Apenas membros de um projeto conseguem ver/criar tarefas e comentários nele.
-- Apenas o *owner* do projeto (ou um ADMIN) pode atualizar/excluir o projeto e gerenciar membros.
+- Apenas o *owner* do projeto (ou um ADMIN) pode atualizar/excluir o projeto e enviar convites.
+- **Entrar num projeto exige convite aceito** — não existe endpoint que adicione alguém como membro à força a partir de um id. O owner convida por e-mail (`POST /api/projects/{id}/invitations`); o convite só vira participação de fato quando o próprio convidado aceita (`POST /api/invitations/{id}/accept`). Convites só podem ser enviados para e-mails já cadastrados, não podem duplicar um convite pendente, nem ser enviados para quem já é membro.
 - Uma tarefa só pode ser excluída pelo seu criador, pelo owner do projeto, ou por um ADMIN.
 - O responsável (*assignee*) de uma tarefa precisa ser membro do projeto.
 - Um comentário só pode ser excluído pelo seu autor ou por um ADMIN.
@@ -100,6 +101,15 @@ curl -X POST http://localhost:8080/api/projects \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"name":"TaskFlow Portfolio","description":"Projeto de demonstracao"}'
 
+# Convidar um membro por e-mail (substitua $PROJECT_ID; o e-mail precisa ter conta cadastrada)
+curl -X POST http://localhost:8080/api/projects/$PROJECT_ID/invitations \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"email":"grace@taskflow.dev"}'
+
+# A pessoa convidada aceita (autenticada com o próprio token, substitua $INVITATION_ID)
+curl -X POST http://localhost:8080/api/invitations/$INVITATION_ID/accept \
+  -H "Authorization: Bearer $GRACE_TOKEN"
+
 # Criar tarefa no projeto (substitua $PROJECT_ID)
 curl -X POST http://localhost:8080/api/projects/$PROJECT_ID/tasks \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -132,7 +142,12 @@ Há também testes de integração (`@Tag("integration")`) que sobem um PostgreS
 | POST | `/api/projects` | Cria projeto | JWT |
 | GET | `/api/projects` | Lista projetos do usuário (filtros: `name`, `status`; paginado) | JWT |
 | GET \| PUT \| DELETE | `/api/projects/{id}` | Busca / atualiza / remove projeto | JWT (membro / owner+ADMIN) |
-| POST \| DELETE | `/api/projects/{id}/members{/{userId}}` | Adiciona / remove membro | JWT (owner + ADMIN) |
+| DELETE | `/api/projects/{id}/members/{userId}` | Remove membro | JWT (owner + ADMIN) |
+| POST | `/api/projects/{id}/invitations` | Convida um usuário pelo e-mail | JWT (owner + ADMIN) |
+| GET | `/api/projects/{id}/invitations` | Lista convites enviados do projeto (paginado) | JWT (owner + ADMIN) |
+| GET | `/api/invitations/me` | Lista convites recebidos pelo usuário autenticado (filtro `status`; paginado) | JWT |
+| POST | `/api/invitations/{id}/accept` | Aceita um convite — só então vira membro | JWT (o próprio convidado) |
+| POST | `/api/invitations/{id}/decline` | Recusa um convite | JWT (o próprio convidado) |
 | POST | `/api/projects/{projectId}/tasks` | Cria tarefa | JWT (membro) |
 | GET | `/api/projects/{projectId}/tasks` | Lista tarefas (filtros: `status`, `priority`, `assigneeId`, `title`; paginado) | JWT (membro) |
 | GET \| PUT \| DELETE | `/api/tasks/{id}` | Busca / atualiza / remove tarefa | JWT (membro / criador+owner+ADMIN) |
@@ -182,6 +197,23 @@ Use o `token` no header `Authorization: Bearer <token>` em todas as chamadas aut
 ```
 
 Associações (`owner`, `members`, `assignee`, `createdBy`, `author`) sempre vêm expandidas como objeto — nunca só o id — para evitar uma segunda chamada em telas de listagem.
+
+### Convite — ex. `POST /api/projects/{id}/invitations`
+
+```json
+{
+  "id": "9f3e2b1a-0c4d-4e5f-8a6b-7c8d9e0f1a2b",
+  "projectId": "37225a58-8f86-4920-a22f-6e359e73743d",
+  "projectName": "Outro Projeto",
+  "invitedUser": { "id": "...", "name": "Grace Hopper", "email": "grace@taskflow.dev", "role": "USER", "createdAt": "..." },
+  "invitedBy": { "id": "...", "name": "Ada Lovelace", "email": "ada@taskflow.dev", "role": "USER", "createdAt": "..." },
+  "status": "PENDING",
+  "createdAt": "2026-07-06T16:20:00Z",
+  "respondedAt": null
+}
+```
+
+`status` muda para `ACCEPTED` ou `DECLINED` (com `respondedAt` preenchido) após a chamada em `/api/invitations/{id}/accept` ou `/decline` — só nesse momento o convidado passa a aparecer em `members` do projeto.
 
 ### Lista paginada — ex. `GET /api/projects` ou `/api/projects/{id}/tasks`
 
@@ -236,8 +268,8 @@ Em erros de validação (`400`), `fieldErrors` vem preenchido com um item por ca
 | `400` | Payload inválido (`@Valid` falhou) — corpo com `fieldErrors` |
 | `401` | Credenciais inválidas no login |
 | `403` | Token ausente/inválido, ou usuário autenticado sem permissão (ex.: não é membro do projeto, não é owner) |
-| `404` | Recurso inexistente (projeto, tarefa, comentário, usuário) |
-| `409` | E-mail já cadastrado no registro |
+| `404` | Recurso inexistente (projeto, tarefa, comentário, usuário) — inclui convidar um e-mail sem conta cadastrada |
+| `409` | E-mail já cadastrado no registro; convite duplicado/já respondido; convidar quem já é membro |
 | `500` | Erro inesperado (logado no servidor com stack trace; nunca vaza detalhe interno na resposta) |
 
 ## Decisões de design
@@ -246,3 +278,4 @@ Em erros de validação (`400`), `fieldErrors` vem preenchido com um item por ca
 - **Autorização na camada de serviço**, não em `@PreAuthorize` com SpEL complexo — mantém as regras legíveis e testáveis com um mock simples de repositório.
 - **MapStruct** para mapeamento DTO/entidade — evita boilerplate manual e erros de mapeamento silenciosos.
 - **Sem refresh token**: o token JWT tem validade configurável (`taskflow.security.jwt.expiration-minutes`, padrão 24h) — suficiente para o escopo deste projeto; um mecanismo de refresh/revogação seria o próximo passo natural em um cenário de produção.
+- **Convite por e-mail em vez de "adicionar membro por id"**: entrar num projeto exige consentimento explícito do convidado (`accept`/`decline`), não apenas o owner informar um id qualquer — evita adicionar alguém sem que ela saiba, e não expõe UUIDs internos no fluxo do usuário. Um índice único parcial no banco (`project_invitations`, `WHERE status = 'PENDING'`) garante que não existam dois convites pendentes duplicados para o mesmo par projeto/usuário, mesmo sob concorrência.

@@ -38,6 +38,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(InvitationConflictException.class)
+    public ResponseEntity<ErrorResponse> handleInvitationConflict(InvitationConflictException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
+
     @ExceptionHandler({InvalidCredentialsException.class, BadCredentialsException.class})
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(RuntimeException ex, HttpServletRequest request) {
         return build(HttpStatus.UNAUTHORIZED, "Invalid email or password", request);

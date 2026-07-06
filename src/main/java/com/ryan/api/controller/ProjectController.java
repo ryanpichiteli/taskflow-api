@@ -1,7 +1,6 @@
 package com.ryan.api.controller;
 
 import com.ryan.api.dto.common.PageResponse;
-import com.ryan.api.dto.project.AddMemberRequest;
 import com.ryan.api.dto.project.ProjectCreateRequest;
 import com.ryan.api.dto.project.ProjectResponse;
 import com.ryan.api.dto.project.ProjectUpdateRequest;
@@ -73,13 +72,6 @@ public class ProjectController {
     public ResponseEntity<Void> delete(@PathVariable UUID id, @AuthenticationPrincipal UserPrincipal principal) {
         projectService.delete(id, principal.getUser());
         return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}/members")
-    @Operation(summary = "Adiciona um membro ao projeto (somente owner ou ADMIN)")
-    public ProjectResponse addMember(@PathVariable UUID id, @Valid @RequestBody AddMemberRequest request,
-                                      @AuthenticationPrincipal UserPrincipal principal) {
-        return projectService.addMember(id, request, principal.getUser());
     }
 
     @DeleteMapping("/{id}/members/{userId}")

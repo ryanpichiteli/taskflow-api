@@ -34,9 +34,6 @@ class ProjectServiceTest {
     @Mock
     private ProjectMapper projectMapper;
 
-    @Mock
-    private UserService userService;
-
     private ProjectService projectService;
 
     private User owner;
@@ -46,7 +43,7 @@ class ProjectServiceTest {
 
     @BeforeEach
     void setUp() {
-        projectService = new ProjectService(projectRepository, projectMapper, userService);
+        projectService = new ProjectService(projectRepository, projectMapper);
 
         owner = userWithId("Owner", Role.USER);
         outsider = userWithId("Outsider", Role.USER);

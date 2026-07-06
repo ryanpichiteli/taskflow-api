@@ -1,6 +1,5 @@
 package com.ryan.api.service;
 
-import com.ryan.api.dto.project.AddMemberRequest;
 import com.ryan.api.dto.project.ProjectCreateRequest;
 import com.ryan.api.dto.project.ProjectResponse;
 import com.ryan.api.dto.project.ProjectUpdateRequest;
@@ -27,12 +26,10 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectMapper projectMapper;
-    private final UserService userService;
 
-    public ProjectService(ProjectRepository projectRepository, ProjectMapper projectMapper, UserService userService) {
+    public ProjectService(ProjectRepository projectRepository, ProjectMapper projectMapper) {
         this.projectRepository = projectRepository;
         this.projectMapper = projectMapper;
-        this.userService = userService;
     }
 
     @Transactional
@@ -76,17 +73,6 @@ public class ProjectService {
     }
 
     @Transactional
-    public ProjectResponse addMember(UUID id, AddMemberRequest request, User currentUser) {
-        Project project = getEntityById(id);
-        requireOwnerOrAdmin(project, currentUser);
-
-        User newMember = userService.getEntityById(request.userId());
-        project.getMembers().add(newMember);
-
-        return projectMapper.toResponse(project);
-    }
-
-    @Transactional
     public ProjectResponse removeMember(UUID id, UUID userId, User currentUser) {
         Project project = getEntityById(id);
         requireOwnerOrAdmin(project, currentUser);
@@ -114,7 +100,7 @@ public class ProjectService {
         }
     }
 
-    private void requireOwnerOrAdmin(Project project, User currentUser) {
+    void requireOwnerOrAdmin(Project project, User currentUser) {
         if (currentUser.getRole() == Role.ADMIN) {
             return;
         }
