@@ -62,6 +62,25 @@ docker compose up -d postgres
 ./mvnw spring-boot:run
 ```
 
+### Opção 3 — Railway (deploy real)
+
+O repositório já inclui `railway.json` configurado para buildar a partir do `Dockerfile` (builder `DOCKERFILE`). Passos no painel do Railway:
+
+1. Crie o serviço a partir deste repositório (Railway detecta o `railway.json` e builda a imagem automaticamente — não precisa de `docker compose`, que só existe para uso local).
+2. Adicione um plugin **PostgreSQL** ao projeto.
+3. Nas variáveis de ambiente do serviço da API, aponte para o Postgres via *reference variables*:
+
+   ```
+   DB_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}
+   DB_USERNAME=${{Postgres.PGUSER}}
+   DB_PASSWORD=${{Postgres.PGPASSWORD}}
+   JWT_SECRET=<uma chave base64 própria, diferente da usada em dev>
+   ```
+
+4. O Railway injeta automaticamente a variável `PORT`, que a aplicação já respeita (`server.port` em `application.yml`).
+
+Não é necessário (nem funciona) rodar `docker compose up --build` como *start command* — o Railway já builda a imagem do Dockerfile e executa o `ENTRYPOINT` dele (`java -jar app.jar`) diretamente; `docker compose` não existe dentro do container em produção.
+
 ### Documentação interativa
 
 Com a aplicação no ar: `http://localhost:8080/swagger-ui.html`
